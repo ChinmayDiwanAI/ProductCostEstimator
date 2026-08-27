@@ -5,9 +5,11 @@ import type {
   Product,
   ProductMaterial,
   AppSettings,
+  CloudSyncConfig,
 } from '../types';
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_CLOUD_SYNC,
   STORAGE_KEY,
   STORAGE_VERSION,
 } from '../types';
@@ -18,6 +20,7 @@ import {
   resolveProductMaterials,
 } from '../utils/calculations';
 import { generateId } from '../utils/id';
+import { jsonBinSyncService, type SyncResult } from '../utils/cloudSync';
 
 type Action =
   | { type: 'LOAD_STATE'; payload: AppState }
@@ -29,13 +32,16 @@ type Action =
   | { type: 'DELETE_PRODUCT'; payload: string }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> }
   | { type: 'SET_LAST_OPENED_PRODUCT'; payload: string | undefined }
-  | { type: 'RESET_STATE' };
+  | { type: 'RESET_STATE' }
+  | { type: 'UPDATE_CLOUD_SYNC'; payload: Partial<CloudSyncConfig> }
+  | { type: 'SET_SYNC_STATUS'; payload: { syncing: boolean; lastSyncAt?: string; error?: string } };
 
 const initialState: AppState = {
   materials: [],
   products: [],
   settings: DEFAULT_SETTINGS,
   lastOpenedProductId: undefined,
+  cloudSync: DEFAULT_CLOUD_SYNC,
 };
 
 function reducer(state: AppState, action: Action): AppState {
@@ -129,6 +135,23 @@ function reducer(state: AppState, action: Action): AppState {
       return initialState;
     }
     
+    case 'UPDATE_CLOUD_SYNC': {
+      return {
+        ...state,
+        cloudSync: { ...state.cloudSync, ...action.payload },
+      };
+    }
+    
+    case 'SET_SYNC_STATUS': {
+      return {
+        ...state,
+        cloudSync: {
+          ...state.cloudSync,
+          lastSyncAt: action.payload.lastSyncAt ?? state.cloudSync.lastSyncAt,
+        },
+      };
+    }
+    
     default:
       return state;
   }
@@ -158,6 +181,12 @@ interface AppContextValue {
   getProductById: (id: string) => Product | undefined;
   exportData: () => string;
   importData: (json: string) => boolean;
+  // Cloud sync methods
+  updateCloudSync: (config: Partial<CloudSyncConfig>) => void;
+  testConnection: () => Promise<SyncResult>;
+  syncNow: () => Promise<SyncResult>;
+  enableAutoSync: (enabled: boolean) => void;
+  setConflictStrategy: (strategy: 'local-wins' | 'remote-wins' | 'manual') => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -193,6 +222,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.error('Failed to save state to localStorage:', error);
     }
   }, [state]);
+
+  // Auto-sync to cloud when enabled and state changes
+  useEffect(() => {
+    if (state.cloudSync.enabled && state.cloudSync.autoSync && state.cloudSync.jsonbin?.binId && state.cloudSync.jsonbin?.apiKey) {
+      // Debounce sync to avoid excessive API calls
+      const timeoutId = setTimeout(async () => {
+        try {
+          const result = await jsonBinSyncService.pushData(state.cloudSync, {
+            materials: state.materials,
+            products: state.products,
+            settings: state.settings,
+            lastOpenedProductId: state.lastOpenedProductId,
+            cloudSync: { ...state.cloudSync, lastSyncAt: new Date().toISOString() },
+          });
+
+          if (result.success) {
+            dispatch({ type: 'SET_SYNC_STATUS', payload: { syncing: false, lastSyncAt: new Date().toISOString() } });
+          }
+        } catch (error) {
+          console.error('Auto-sync failed:', error);
+        }
+      }, 1000); // 1 second debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [state.materials, state.products, state.settings, state.lastOpenedProductId, state.cloudSync.enabled, state.cloudSync.autoSync]);
   
   const addMaterial = (material: Omit<Material, 'id' | 'costPerUnit' | 'createdAt' | 'updatedAt'>) => {
     dispatch({ type: 'ADD_MATERIAL', payload: material });
@@ -266,7 +321,55 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return false;
     }
   };
-  
+
+  // Cloud sync methods
+  const updateCloudSync = (config: Partial<CloudSyncConfig>) => {
+    dispatch({ type: 'UPDATE_CLOUD_SYNC', payload: config });
+  };
+
+  const testConnection = async (): Promise<SyncResult> => {
+    const { cloudSync } = state;
+    if (!cloudSync.enabled || !cloudSync.jsonbin?.binId || !cloudSync.jsonbin?.apiKey) {
+      return { success: false, error: 'Cloud sync not configured' };
+    }
+    return jsonBinSyncService.testConnection(cloudSync);
+  };
+
+  const syncNow = async (): Promise<SyncResult> => {
+    const { cloudSync } = state;
+    if (!cloudSync.enabled || !cloudSync.jsonbin?.binId || !cloudSync.jsonbin?.apiKey) {
+      return { success: false, error: 'Cloud sync not configured' };
+    }
+
+    try {
+      // Push local data to remote
+      const pushResult = await jsonBinSyncService.pushData(cloudSync, {
+        materials: state.materials,
+        products: state.products,
+        settings: state.settings,
+        lastOpenedProductId: state.lastOpenedProductId,
+        cloudSync: { ...cloudSync, lastSyncAt: new Date().toISOString() },
+      });
+
+      if (!pushResult.success) {
+        return pushResult;
+      }
+
+      dispatch({ type: 'SET_SYNC_STATUS', payload: { syncing: false, lastSyncAt: new Date().toISOString() } });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Sync failed' };
+    }
+  };
+
+  const enableAutoSync = (enabled: boolean) => {
+    dispatch({ type: 'UPDATE_CLOUD_SYNC', payload: { autoSync: enabled } });
+  };
+
+  const setConflictStrategy = (strategy: 'local-wins' | 'remote-wins' | 'manual') => {
+    dispatch({ type: 'UPDATE_CLOUD_SYNC', payload: { conflictStrategy: strategy } });
+  };
+
   const value: AppContextValue = {
     state,
     dispatch,
@@ -283,6 +386,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getProductById,
     exportData,
     importData,
+    // Cloud sync methods
+    updateCloudSync,
+    testConnection,
+    syncNow,
+    enableAutoSync,
+    setConflictStrategy,
   };
   
   return (

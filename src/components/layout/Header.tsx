@@ -1,17 +1,23 @@
 import React from 'react';
-import { Settings, Download, Upload, FileText } from 'lucide-react';
+import { Settings, Download, Upload, FileText, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Modal } from '../common/Modal';
+import { Input } from '../common/Input';
 import { useApp } from '../../context/AppContext';
 import { useToast } from '../common/Toast';
 
 export const Header: React.FC = () => {
-  const { state, exportData, importData, updateSettings, dispatch } = useApp();
+  const { state, exportData, importData, updateSettings, dispatch, updateCloudSync, testConnection, syncNow, enableAutoSync, setConflictStrategy } = useApp();
   const { showSuccess, showError } = useToast();
   const [showSettings, setShowSettings] = React.useState(false);
   const [showExport, setShowExport] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
+  const [showCloudSync, setShowCloudSync] = React.useState(false);
   const [importJson, setImportJson] = React.useState('');
+  const [cloudBinId, setCloudBinId] = React.useState(state.cloudSync.jsonbin?.binId || '');
+  const [cloudApiKey, setCloudApiKey] = React.useState(state.cloudSync.jsonbin?.apiKey || '');
+  const [testingConnection, setTestingConnection] = React.useState(false);
+  const [syncing, setSyncing] = React.useState(false);
 
   const handleExport = () => {
     const json = exportData();
@@ -131,6 +137,15 @@ export const Header: React.FC = () => {
                 Import Data
               </Button>
               <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                leftIcon={<Cloud className="w-4 h-4" />}
+                onClick={() => { setShowSettings(false); setShowCloudSync(true); }}
+              >
+                Cloud Sync Settings
+              </Button>
+              <Button
                 variant="danger"
                 size="sm"
                 fullWidth
@@ -202,6 +217,165 @@ export const Header: React.FC = () => {
               Import
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Cloud Sync Modal */}
+      <Modal
+        isOpen={showCloudSync}
+        onClose={() => setShowCloudSync(false)}
+        title="Cloud Sync Settings"
+        description="Configure JSONBin.io to sync your data across devices. Get your API key and Bin ID from https://jsonbin.io"
+        size="md"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-medium text-gray-900 mb-3">JSONBin.io Configuration</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="label">Bin ID</label>
+                <Input
+                  type="text"
+                  placeholder="Enter your Bin ID"
+                  value={cloudBinId}
+                  onChange={(e) => setCloudBinId(e.target.value)}
+                  className="input"
+                />
+              </div>
+              <div>
+                <label className="label">API Key (Master Key)</label>
+                <Input
+                  type="password"
+                  placeholder="Enter your Master Key"
+                  value={cloudApiKey}
+                  onChange={(e) => setCloudApiKey(e.target.value)}
+                  className="input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-sm font-medium text-gray-900 mb-3">Sync Options</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Enable Cloud Sync</p>
+                  <p className="text-xs text-gray-500">Automatically sync data to JSONBin.io</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={state.cloudSync.enabled}
+                    onChange={(e) => updateCloudSync({ enabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between" style={{ opacity: state.cloudSync.enabled ? 1 : 0.5 }}>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Auto Sync</p>
+                  <p className="text-xs text-gray-500">Sync automatically when data changes</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={state.cloudSync.autoSync}
+                    onChange={(e) => enableAutoSync(e.target.checked)}
+                    disabled={!state.cloudSync.enabled}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between" style={{ opacity: state.cloudSync.enabled ? 1 : 0.5 }}>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Conflict Strategy</p>
+                  <p className="text-xs text-gray-500">How to handle conflicts between local and remote data</p>
+                </div>
+                <select
+                  value={state.cloudSync.conflictStrategy}
+                  onChange={(e) => setConflictStrategy(e.target.value as 'local-wins' | 'remote-wins' | 'manual')}
+                  disabled={!state.cloudSync.enabled}
+                  className="input w-auto"
+                >
+                  <option value="remote-wins">Remote Wins (Server data overwrites local)</option>
+                  <option value="local-wins">Local Wins (Keep local data)</option>
+                  <option value="manual">Manual (Prompt to resolve)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 pt-6">
+            <h3 className="text-sm font-medium text-gray-900 mb-3">Actions</h3>
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                leftIcon={<RefreshCw className="w-4 h-4" />}
+                onClick={async () => {
+                  setTestingConnection(true);
+                  const result = await testConnection();
+                  setTestingConnection(false);
+                  if (result.success) {
+                    showSuccess('Connection successful!');
+                  } else {
+                    showError(result.error || 'Connection failed');
+                  }
+                }}
+                disabled={testingConnection || !cloudBinId || !cloudApiKey}
+              >
+                {testingConnection ? 'Testing...' : 'Test Connection'}
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                leftIcon={<CloudCheck className="w-4 h-4" />}
+                onClick={async () => {
+                  setSyncing(true);
+                  const result = await syncNow();
+                  setSyncing(false);
+                  if (result.success) {
+                    showSuccess('Sync completed successfully!');
+                    setShowCloudSync(false);
+                  } else {
+                    showError(result.error || 'Sync failed');
+                  }
+                }}
+                disabled={syncing || !state.cloudSync.enabled || !cloudBinId || !cloudApiKey}
+              >
+                {syncing ? 'Syncing...' : 'Sync Now'}
+              </Button>
+            </div>
+          </div>
+
+          {state.cloudSync.lastSyncAt && (
+            <div className="p-3 bg-primary-50 border border-primary-200 rounded-lg">
+              <p className="text-sm text-primary-800">
+                <span className="font-medium">Last sync:</span> {new Date(state.cloudSync.lastSyncAt).toLocaleString()}
+              </p>
+            </div>
+          )}
+
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <p className="text-xs text-gray-600">
+              <strong>How it works:</strong> Your data is stored in a JSONBin.io bin (a cloud JSON storage).
+              No backend server needed. Get a free account at jsonbin.io, create a bin, and use the Bin ID and Master Key here.
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="secondary" onClick={() => {
+            updateCloudSync({ jsonbin: { binId: cloudBinId, apiKey: cloudApiKey } });
+            setShowCloudSync(false);
+          }}>Save & Close</Button>
         </div>
       </Modal>
     </header>

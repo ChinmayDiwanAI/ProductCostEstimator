@@ -69,17 +69,42 @@ export interface AppSettings {
   currency: 'AUD';
 }
 
+// Cloud Sync Configuration
+export interface CloudSyncConfig {
+  enabled: boolean;
+  provider: 'jsonbin' | 'gist';
+  jsonbin?: {
+    binId: string;
+    apiKey: string;
+  };
+  gist?: {
+    gistId: string;
+    token: string;
+  };
+  autoSync: boolean;
+  lastSyncAt?: string;
+  conflictStrategy: 'local-wins' | 'remote-wins' | 'manual';
+}
+
 export interface AppState {
   materials: Material[];
   products: Product[];
   settings: AppSettings;
   lastOpenedProductId?: string;
+  cloudSync: CloudSyncConfig;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultHourlyRate: 25,
   defaultMarkupPercent: 50,
   currency: 'AUD',
+};
+
+export const DEFAULT_CLOUD_SYNC: CloudSyncConfig = {
+  enabled: false,
+  provider: 'jsonbin',
+  autoSync: false,
+  conflictStrategy: 'remote-wins',
 };
 
 export const STORAGE_KEY = 'product-cost-estimator:v1';
