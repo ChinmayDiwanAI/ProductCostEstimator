@@ -163,12 +163,12 @@ export const MaterialForm: React.FC<MaterialFormProps> = ({
             label="Bulk Cost (AUD) *"
             type="number"
             min="0"
-            step="0.01"
+            step="0.00001"
             value={formData.bulkCost}
             onChange={(e) => handleChange('bulkCost', parseFloat(e.target.value) || 0)}
             error={errors.bulkCost}
-            placeholder="5.00"
-            helperText="Total cost for bulk quantity"
+            placeholder="5.00000"
+            helperText="Total cost for bulk quantity (supports 5 decimal places)"
           />
         </div>
 
@@ -176,7 +176,7 @@ export const MaterialForm: React.FC<MaterialFormProps> = ({
           <p className="text-sm text-gray-600">
             <span className="font-medium">Cost per unit:</span>{' '}
             <span className="text-primary-600 font-semibold">
-              {costPerUnit.toFixed(4)} AUD/{formData.unit || 'unit'}
+              {costPerUnit.toFixed(5)} AUD/{formData.unit || 'unit'}
             </span>
           </p>
         </div>

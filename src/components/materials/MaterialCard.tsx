@@ -2,7 +2,6 @@ import React from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { formatCurrency } from '../../utils/currency';
 import { MATERIAL_CATEGORIES } from '../../types';
 import type { Material } from '../../types';
 
@@ -31,14 +30,14 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
           
           <div className="flex items-center gap-3 text-sm text-gray-600 mb-2">
             <span className="font-medium text-gray-900">
-              {formatCurrency(material.costPerUnit)}
+              {material.costPerUnit.toFixed(5)}
             </span>
             <span className="text-gray-400">/</span>
             <span>{material.unit}</span>
           </div>
           
           <p className="text-xs text-gray-500">
-            {formatCurrency(material.bulkCost)} for {material.bulkQuantity} {material.unit}
+            {material.bulkCost.toFixed(5)} for {material.bulkQuantity} {material.unit}
           </p>
           
           {material.supplier && (

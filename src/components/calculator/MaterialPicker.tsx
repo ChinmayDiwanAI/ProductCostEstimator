@@ -171,7 +171,7 @@ export const MaterialPicker: React.FC<MaterialPickerProps> = ({
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{material.name}</p>
                       <p className="text-sm text-gray-500">
-                        {formatCurrency(material.costPerUnit)}/{material.unit}
+                        {material.costPerUnit.toFixed(5)}/{material.unit}
                       </p>
                     </div>
                   </button>

@@ -63,7 +63,7 @@ export const CostBreakdown: React.FC<CostBreakdownProps> = ({
                 <div>
                   <p className="font-medium text-gray-900">{m.material?.name || 'Unknown'}</p>
                   <p className="text-xs text-gray-500">
-                    {m.quantity} × {formatCurrency(m.costPerUnit)}/{m.material?.unit}
+                    {m.quantity} × {m.costPerUnit.toFixed(5)}/{m.material?.unit}
                   </p>
                 </div>
               </div>
