@@ -181,6 +181,11 @@ interface AppContextValue {
   getProductById: (id: string) => Product | undefined;
   exportData: () => string;
   importData: (json: string) => boolean;
+  // Granular export/import
+  exportMaterials: () => string;
+  exportProducts: () => string;
+  importMaterials: (json: string) => boolean;
+  importProducts: (json: string) => boolean;
   // Cloud sync methods
   updateCloudSync: (config: Partial<CloudSyncConfig>) => void;
   testConnection: () => Promise<SyncResult>;
@@ -322,6 +327,101 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Granular export/import methods
+  const exportMaterials = (): string => {
+    return JSON.stringify(state.materials, null, 2);
+  };
+
+  const exportProducts = (): string => {
+    return JSON.stringify(state.products, null, 2);
+  };
+
+  const importMaterials = (json: string): boolean => {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed)) {
+        // Validate each material has required fields
+        const validMaterials = parsed.every(m =>
+          m && typeof m === 'object' &&
+          typeof m.id === 'string' &&
+          typeof m.name === 'string' &&
+          typeof m.category === 'string' &&
+          typeof m.unit === 'string' &&
+          typeof m.bulkQuantity === 'number' &&
+          typeof m.bulkCost === 'number' &&
+          typeof m.costPerUnit === 'number' &&
+          typeof m.createdAt === 'string' &&
+          typeof m.updatedAt === 'string'
+        );
+        if (validMaterials) {
+          // Update existing materials or add new ones
+          parsed.forEach((material: Material) => {
+            const existingIndex = state.materials.findIndex(m => m.id === material.id);
+            if (existingIndex >= 0) {
+              dispatch({ type: 'UPDATE_MATERIAL', payload: material });
+            } else {
+              dispatch({ type: 'ADD_MATERIAL', payload: {
+                name: material.name,
+                category: material.category as any,
+                unit: material.unit,
+                bulkQuantity: material.bulkQuantity,
+                bulkCost: material.bulkCost,
+                supplier: material.supplier,
+                notes: material.notes,
+              }});
+            }
+          });
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const importProducts = (json: string): boolean => {
+    try {
+      const parsed = JSON.parse(json);
+      if (Array.isArray(parsed)) {
+        // Validate each product has required fields
+        const validProducts = parsed.every(p =>
+          p && typeof p === 'object' &&
+          typeof p.id === 'string' &&
+          typeof p.name === 'string' &&
+          Array.isArray(p.materials) &&
+          typeof p.laborHours === 'number' &&
+          typeof p.hourlyRate === 'number' &&
+          typeof p.markupPercent === 'number' &&
+          typeof p.createdAt === 'string' &&
+          typeof p.updatedAt === 'string'
+        );
+        if (validProducts) {
+          parsed.forEach((product: Product) => {
+            const existingIndex = state.products.findIndex(p => p.id === product.id);
+            if (existingIndex >= 0) {
+              dispatch({ type: 'UPDATE_PRODUCT', payload: product });
+            } else {
+              dispatch({ type: 'ADD_PRODUCT', payload: {
+                name: product.name,
+                description: product.description,
+                photo: product.photo,
+                materials: product.materials,
+                laborHours: product.laborHours,
+                hourlyRate: product.hourlyRate,
+                markupPercent: product.markupPercent,
+              }});
+            }
+          });
+          return true;
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   // Cloud sync methods
   const updateCloudSync = (config: Partial<CloudSyncConfig>) => {
     dispatch({ type: 'UPDATE_CLOUD_SYNC', payload: config });
@@ -386,6 +486,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getProductById,
     exportData,
     importData,
+    // Granular export/import
+    exportMaterials,
+    exportProducts,
+    importMaterials,
+    importProducts,
     // Cloud sync methods
     updateCloudSync,
     testConnection,

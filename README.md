@@ -65,6 +65,20 @@ The app will be available at `https://<username>.github.io/ProductCostEstimator/
 
 All data is stored in localStorage in your browser. Use the Export/Import feature in the header menu to backup or migrate data.
 
+### Export/Import Options
+
+**Full Backup/Restore** (Settings → Data Management):
+- **Export All Data** - Complete backup including materials, products, settings, and photos
+- **Import All Data** - Restore complete backup (replaces all current data)
+
+**Granular Export/Import** (Settings → Data Management):
+- **Export Materials Only** - Export just the materials list
+- **Export Products Only** - Export just the product recipes
+- **Import Materials Only** - Import materials (updates existing by ID, adds new)
+- **Import Products Only** - Import products (updates existing by ID, adds new)
+
+**Photos**: Base64-encoded product photos are included in all exports and cloud sync by default. For large photo collections, consider using granular exports for materials/products only.
+
 ### Cloud Sync with JSONBin.io
 
 For cross-device synchronization, configure JSONBin.io in Settings → Cloud Sync Settings:
@@ -76,3 +90,5 @@ For cross-device synchronization, configure JSONBin.io in Settings → Cloud Syn
 5. Enable "Enable Cloud Sync" and optionally "Auto Sync"
 
 Your data will sync automatically (if Auto Sync enabled) or manually via the "Sync Now" button. No backend server required - JSONBin.io handles the storage and API.
+
+**Sync Includes**: All materials, products, settings, and product photos (base64). The sync uses a "remote-wins" strategy by default (configurable), meaning the cloud version overwrites local data. With large photo collections, sync may take longer and use more bandwidth.

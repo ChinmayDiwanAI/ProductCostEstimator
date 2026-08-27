@@ -7,13 +7,19 @@ import { useApp } from '../../context/AppContext';
 import { useToast } from '../common/Toast';
 
 export const Header: React.FC = () => {
-  const { state, exportData, importData, updateSettings, dispatch, updateCloudSync, testConnection, syncNow, enableAutoSync, setConflictStrategy } = useApp();
+  const { state, exportData, importData, updateSettings, dispatch, updateCloudSync, testConnection, syncNow, enableAutoSync, setConflictStrategy, exportMaterials, exportProducts, importMaterials, importProducts } = useApp();
   const { showSuccess, showError } = useToast();
   const [showSettings, setShowSettings] = React.useState(false);
   const [showExport, setShowExport] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [showCloudSync, setShowCloudSync] = React.useState(false);
+  const [showExportMaterials, setShowExportMaterials] = React.useState(false);
+  const [showExportProducts, setShowExportProducts] = React.useState(false);
+  const [showImportMaterials, setShowImportMaterials] = React.useState(false);
+  const [showImportProducts, setShowImportProducts] = React.useState(false);
   const [importJson, setImportJson] = React.useState('');
+  const [importMaterialsJson, setImportMaterialsJson] = React.useState('');
+  const [importProductsJson, setImportProductsJson] = React.useState('');
   const [cloudBinId, setCloudBinId] = React.useState(state.cloudSync.jsonbin?.binId || '');
   const [cloudApiKey, setCloudApiKey] = React.useState(state.cloudSync.jsonbin?.apiKey || '');
   const [testingConnection, setTestingConnection] = React.useState(false);
@@ -34,11 +40,61 @@ export const Header: React.FC = () => {
     setShowExport(false);
   };
 
+  const handleExportMaterials = () => {
+    const json = exportMaterials();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `materials-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showSuccess('Materials exported successfully!');
+    setShowExportMaterials(false);
+  };
+
+  const handleExportProducts = () => {
+    const json = exportProducts();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showSuccess('Products exported successfully!');
+    setShowExportProducts(false);
+  };
+
   const handleImport = () => {
     if (importData(importJson)) {
       showSuccess('Data imported successfully!');
       setImportJson('');
       setShowImport(false);
+    } else {
+      showError('Invalid JSON file. Please check the format.');
+    }
+  };
+
+  const handleImportMaterials = () => {
+    if (importMaterials(importMaterialsJson)) {
+      showSuccess('Materials imported successfully!');
+      setImportMaterialsJson('');
+      setShowImportMaterials(false);
+    } else {
+      showError('Invalid JSON file. Please check the format.');
+    }
+  };
+
+  const handleImportProducts = () => {
+    if (importProducts(importProductsJson)) {
+      showSuccess('Products imported successfully!');
+      setImportProductsJson('');
+      setShowImportProducts(false);
     } else {
       showError('Invalid JSON file. Please check the format.');
     }
@@ -50,6 +106,28 @@ export const Header: React.FC = () => {
       const reader = new FileReader();
       reader.onload = (event) => {
         setImportJson(event.target?.result as string);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleMaterialsFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImportMaterialsJson(event.target?.result as string);
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleProductsFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImportProductsJson(event.target?.result as string);
       };
       reader.readAsText(file);
     }
@@ -116,52 +194,88 @@ export const Header: React.FC = () => {
           </div>
           
           <div className="border-t border-gray-100 pt-6">
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Data Management</h3>
-            <div className="flex flex-col gap-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                leftIcon={<Download className="w-4 h-4" />}
-                onClick={() => setShowExport(true)}
-              >
-                Export Data
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                leftIcon={<Upload className="w-4 h-4" />}
-                onClick={() => setShowImport(true)}
-              >
-                Import Data
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                leftIcon={<Cloud className="w-4 h-4" />}
-                onClick={() => { setShowSettings(false); setShowCloudSync(true); }}
-              >
-                Cloud Sync Settings
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                fullWidth
-                leftIcon={<FileText className="w-4 h-4" />}
-                onClick={() => {
-                  if (confirm('This will delete ALL your materials, products, and settings. Are you sure?')) {
-                    dispatch({ type: 'RESET_STATE' });
-                    showSuccess('All data has been reset');
-                    setShowSettings(false);
-                  }
-                }}
-              >
-                Reset All Data
-              </Button>
-            </div>
-          </div>
+           <h3 className="text-sm font-medium text-gray-900 mb-3">Data Management</h3>
+           <div className="flex flex-col gap-3">
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Download className="w-4 h-4" />}
+               onClick={() => setShowExport(true)}
+             >
+               Export All Data
+             </Button>
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Download className="w-4 h-4" />}
+               onClick={() => setShowExportMaterials(true)}
+             >
+               Export Materials Only
+             </Button>
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Download className="w-4 h-4" />}
+               onClick={() => setShowExportProducts(true)}
+             >
+               Export Products Only
+             </Button>
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Upload className="w-4 h-4" />}
+               onClick={() => setShowImport(true)}
+             >
+               Import All Data
+             </Button>
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Upload className="w-4 h-4" />}
+               onClick={() => setShowImportMaterials(true)}
+             >
+               Import Materials Only
+             </Button>
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Upload className="w-4 h-4" />}
+               onClick={() => setShowImportProducts(true)}
+             >
+               Import Products Only
+             </Button>
+             <Button
+               variant="secondary"
+               size="sm"
+               fullWidth
+               leftIcon={<Cloud className="w-4 h-4" />}
+               onClick={() => { setShowSettings(false); setShowCloudSync(true); }}
+             >
+               Cloud Sync Settings
+             </Button>
+             <Button
+               variant="danger"
+               size="sm"
+               fullWidth
+               leftIcon={<FileText className="w-4 h-4" />}
+               onClick={() => {
+                 if (confirm('This will delete ALL your materials, products, and settings. Are you sure?')) {
+                   dispatch({ type: 'RESET_STATE' });
+                   showSuccess('All data has been reset');
+                   setShowSettings(false);
+                 }
+               }}
+             >
+               Reset All Data
+             </Button>
+           </div>
+         </div>
         </div>
         
         <div className="flex justify-end gap-3 mt-6">
@@ -213,6 +327,108 @@ export const Header: React.FC = () => {
               variant="primary"
               onClick={handleImport}
               disabled={!importJson}
+            >
+              Import
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Export Materials Modal */}
+      <Modal
+        isOpen={showExportMaterials}
+        onClose={() => setShowExportMaterials(false)}
+        title="Export Materials"
+        description="Download a JSON file with all your materials."
+        size="sm"
+      >
+        <div className="text-center py-4">
+          <Download className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-600 mb-4">Your materials will be downloaded as a JSON file.</p>
+          <div className="flex justify-center gap-3">
+            <Button variant="secondary" onClick={() => setShowExportMaterials(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleExportMaterials}>Export</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Export Products Modal */}
+      <Modal
+        isOpen={showExportProducts}
+        onClose={() => setShowExportProducts(false)}
+        title="Export Products"
+        description="Download a JSON file with all your products."
+        size="sm"
+      >
+        <div className="text-center py-4">
+          <Download className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-600 mb-4">Your products will be downloaded as a JSON file.</p>
+          <div className="flex justify-center gap-3">
+            <Button variant="secondary" onClick={() => setShowExportProducts(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleExportProducts}>Export</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Import Materials Modal */}
+      <Modal
+        isOpen={showImportMaterials}
+        onClose={() => { setImportMaterialsJson(''); setShowImportMaterials(false); }}
+        title="Import Materials"
+        description="Select a JSON file to import materials. Existing materials will be updated, new ones added."
+        size="md"
+      >
+        <div className="space-y-4">
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleMaterialsFileImport}
+            className="input"
+          />
+          {importMaterialsJson && (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">File selected. Ready to import.</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => { setImportMaterialsJson(''); setShowImportMaterials(false); }}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleImportMaterials}
+              disabled={!importMaterialsJson}
+            >
+              Import
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Import Products Modal */}
+      <Modal
+        isOpen={showImportProducts}
+        onClose={() => { setImportProductsJson(''); setShowImportProducts(false); }}
+        title="Import Products"
+        description="Select a JSON file to import products. Existing products will be updated, new ones added."
+        size="md"
+      >
+        <div className="space-y-4">
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleProductsFileImport}
+            className="input"
+          />
+          {importProductsJson && (
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">File selected. Ready to import.</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => { setImportProductsJson(''); setShowImportProducts(false); }}>Cancel</Button>
+            <Button
+              variant="primary"
+              onClick={handleImportProducts}
+              disabled={!importProductsJson}
             >
               Import
             </Button>
