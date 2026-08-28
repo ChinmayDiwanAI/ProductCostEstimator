@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   isOpen: boolean;
@@ -13,7 +14,7 @@ interface ModalProps {
   showCloseButton?: boolean;
 }
 
-export const Modal: React.FC<ModalProps> = ({
+const ModalContent: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
@@ -141,4 +142,9 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </div>
   );
+};
+
+export const Modal: React.FC<ModalProps> = (props) => {
+  if (!props.isOpen) return null;
+  return createPortal(<ModalContent {...props} />, document.body);
 };
