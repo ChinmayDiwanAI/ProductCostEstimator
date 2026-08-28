@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Download } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Input } from '../components/common/Input';
 import { ProductCard } from '../components/products/ProductCard';
@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import type { Product } from '../types';
 
 export const ProductsPage: React.FC = () => {
-  const { state, deleteProduct } = useApp();
+  const { state, deleteProduct, exportProducts } = useApp();
   const { showSuccess, showError } = useToast();
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
@@ -53,6 +53,20 @@ export const ProductsPage: React.FC = () => {
 
   const { addProduct } = useApp();
 
+  const handleExport = () => {
+    const json = exportProducts();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `products-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showSuccess('Products exported successfully!');
+  };
+
   const handleDuplicateConfirm = (product: Product) => {
     const newProduct = {
       name: `${product.name} (Copy)`,
@@ -74,13 +88,22 @@ export const ProductsPage: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Products</h1>
           <p className="text-gray-500 mt-1">Your saved product recipes</p>
         </div>
-        <Button
-          variant="primary"
-          leftIcon={<Plus className="w-5 h-5" />}
-          onClick={() => { setEditingProduct(null); setShowForm(true); }}
-        >
-          New Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            leftIcon={<Download className="w-5 h-5" />}
+            onClick={handleExport}
+          >
+            Export
+          </Button>
+          <Button
+            variant="primary"
+            leftIcon={<Plus className="w-5 h-5" />}
+            onClick={() => { setEditingProduct(null); setShowForm(true); }}
+          >
+            New Product
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
