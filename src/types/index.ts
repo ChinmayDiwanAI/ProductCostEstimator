@@ -84,6 +84,7 @@ export interface CloudSyncConfig {
   autoSync: boolean;
   lastSyncAt?: string;
   conflictStrategy: 'local-wins' | 'remote-wins' | 'manual';
+  encryptionPassphrase?: string; // Optional passphrase for client-side AES-GCM encryption
 }
 
 export interface AppState {

@@ -13,6 +13,7 @@ A mobile-first web application for garland craft business cost estimation. Built
 - **Photo Attachment**: Add photos to products
 - **Data Persistence**: localStorage with auto-save and export/import JSON
 - **Cloud Sync (JSONBin.io)**: Sync data across devices without a backend server
+- **End-to-End Encryption**: Optional AES-GCM encryption (passphrase-based) for cloud sync data
 - **Auto-Sync**: Optional automatic synchronization on data changes
 - **Conflict Resolution**: Choose how to handle sync conflicts (local-wins, remote-wins, manual)
 - **Mobile-First Design**: Optimized for mobile use with bottom navigation
@@ -92,3 +93,25 @@ For cross-device synchronization, configure JSONBin.io in Settings → Cloud Syn
 Your data will sync automatically (if Auto Sync enabled) or manually via the "Sync Now" button. No backend server required - JSONBin.io handles the storage and API.
 
 **Sync Includes**: All materials, products, settings, and product photos (base64). The sync uses a "remote-wins" strategy by default (configurable), meaning the cloud version overwrites local data. With large photo collections, sync may take longer and use more bandwidth.
+
+### End-to-End Encryption (AES-GCM)
+
+For enhanced privacy, you can enable client-side encryption for your cloud-synced data:
+
+1. In Cloud Sync Settings, enter an **Encryption Passphrase** (optional)
+2. Your data is encrypted locally using AES-GCM (256-bit) before being sent to JSONBin.io
+3. The passphrase is **never stored** - it stays only in memory during your session
+4. To access data on another device, enter the same passphrase
+
+**Important**:
+- If you lose the passphrase, encrypted data **cannot be recovered** (not even by JSONBin.io)
+- The passphrase is used to derive an encryption key via PBKDF2 (100,000 iterations)
+- Each sync operation uses a unique random salt and IV for security
+- Encrypted data is stored as a single base64 string containing: salt + IV + ciphertext
+- Without the passphrase, the encrypted data appears as random characters to anyone (including JSONBin.io)
+
+**Security Notes**:
+- Passphrase is never transmitted over the network
+- Only you (with the passphrase) can decrypt your data
+- JSONBin.io only sees the encrypted blob - cannot read your materials, products, or photos
+- Changing the passphrase requires re-encrypting and re-syncing all data

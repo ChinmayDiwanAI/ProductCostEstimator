@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 import { useToast } from '../common/Toast';
 
 export const Header: React.FC = () => {
-  const { state, exportData, importData, updateSettings, dispatch, updateCloudSync, testConnection, syncNow, enableAutoSync, setConflictStrategy, exportMaterials, exportProducts, importMaterials, importProducts } = useApp();
+  const { state, exportData, importData, updateSettings, dispatch, updateCloudSync, testConnection, syncNow, enableAutoSync, setConflictStrategy, exportMaterials, exportProducts, importMaterials, importProducts, setEncryptionPassphrase } = useApp();
   const { showSuccess, showError } = useToast();
   const [showSettings, setShowSettings] = React.useState(false);
   const [showExport, setShowExport] = React.useState(false);
@@ -22,6 +22,7 @@ export const Header: React.FC = () => {
   const [importProductsJson, setImportProductsJson] = React.useState('');
   const [cloudBinId, setCloudBinId] = React.useState(state.cloudSync.jsonbin?.binId || '');
   const [cloudApiKey, setCloudApiKey] = React.useState(state.cloudSync.jsonbin?.apiKey || '');
+  const [encryptionPassphrase, setEncryptionPassphraseState] = React.useState('');
   const [testingConnection, setTestingConnection] = React.useState(false);
   const [syncing, setSyncing] = React.useState(false);
 
@@ -467,6 +468,23 @@ export const Header: React.FC = () => {
                   onChange={(e) => setCloudApiKey(e.target.value)}
                   className="input"
                 />
+              </div>
+              <div>
+                <label className="label">Encryption Passphrase (Optional)</label>
+                <Input
+                  type="password"
+                  placeholder="Enter passphrase for AES-GCM encryption"
+                  value={encryptionPassphrase}
+                  onChange={(e) => {
+                    setEncryptionPassphraseState(e.target.value);
+                    setEncryptionPassphrase(e.target.value || undefined);
+                  }}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  If set, your data will be encrypted client-side before syncing to JSONBin.io.
+                  <strong>Remember this passphrase</strong> - it cannot be recovered if lost.
+                </p>
               </div>
             </div>
           </div>

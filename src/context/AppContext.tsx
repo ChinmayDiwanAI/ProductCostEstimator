@@ -192,12 +192,16 @@ interface AppContextValue {
   syncNow: () => Promise<SyncResult>;
   enableAutoSync: (enabled: boolean) => void;
   setConflictStrategy: (strategy: 'local-wins' | 'remote-wins' | 'manual') => void;
+  setEncryptionPassphrase: (passphrase: string | undefined) => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  
+  // Encryption passphrase is kept in memory only (never stored in localStorage)
+  const [encryptionPassphrase, setEncryptionPassphraseState] = React.useState<string | undefined>(undefined);
   
   // Load from localStorage on mount
   useEffect(() => {
@@ -208,7 +212,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Handle both old format (direct state) and new format (with _version)
         const data = parsed._version ? parsed.data : parsed;
         if (data && typeof data === 'object') {
-          dispatch({ type: 'LOAD_STATE', payload: data as AppState });
+          // Don't restore encryption passphrase from storage for security
+          const { encryptionPassphrase: _, ...restData } = data as AppState & { encryptionPassphrase?: string };
+          dispatch({ type: 'LOAD_STATE', payload: restData as AppState });
         }
       }
     } catch (error) {
@@ -216,12 +222,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   
-  // Save to localStorage on every state change
+  // Save to localStorage on every state change (excluding encryption passphrase)
   useEffect(() => {
     try {
+      // Create a copy without the encryption passphrase in cloudSync
+      const stateToSave = {
+        ...state,
+        cloudSync: {
+          ...state.cloudSync,
+          encryptionPassphrase: undefined,
+        },
+      };
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         _version: STORAGE_VERSION,
-        data: state,
+        data: stateToSave,
       }));
     } catch (error) {
       console.error('Failed to save state to localStorage:', error);
@@ -234,7 +248,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Debounce sync to avoid excessive API calls
       const timeoutId = setTimeout(async () => {
         try {
-          const result = await jsonBinSyncService.pushData(state.cloudSync, {
+          const configWithPassphrase = {
+            ...state.cloudSync,
+            encryptionPassphrase,
+          };
+          const result = await jsonBinSyncService.pushData(configWithPassphrase, {
             materials: state.materials,
             products: state.products,
             settings: state.settings,
@@ -252,7 +270,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [state.materials, state.products, state.settings, state.lastOpenedProductId, state.cloudSync.enabled, state.cloudSync.autoSync]);
+  }, [state.materials, state.products, state.settings, state.lastOpenedProductId, state.cloudSync.enabled, state.cloudSync.autoSync, encryptionPassphrase]);
   
   const addMaterial = (material: Omit<Material, 'id' | 'costPerUnit' | 'createdAt' | 'updatedAt'>) => {
     dispatch({ type: 'ADD_MATERIAL', payload: material });
@@ -432,7 +450,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!cloudSync.enabled || !cloudSync.jsonbin?.binId || !cloudSync.jsonbin?.apiKey) {
       return { success: false, error: 'Cloud sync not configured' };
     }
-    return jsonBinSyncService.testConnection(cloudSync);
+    // Include encryption passphrase from memory for test connection
+    const configWithPassphrase = {
+      ...cloudSync,
+      encryptionPassphrase,
+    };
+    return jsonBinSyncService.testConnection(configWithPassphrase);
   };
 
   const syncNow = async (): Promise<SyncResult> => {
@@ -442,8 +465,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Include encryption passphrase from memory for sync
+      const configWithPassphrase = {
+        ...cloudSync,
+        encryptionPassphrase,
+      };
+
       // Push local data to remote
-      const pushResult = await jsonBinSyncService.pushData(cloudSync, {
+      const pushResult = await jsonBinSyncService.pushData(configWithPassphrase, {
         materials: state.materials,
         products: state.products,
         settings: state.settings,
@@ -468,6 +497,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setConflictStrategy = (strategy: 'local-wins' | 'remote-wins' | 'manual') => {
     dispatch({ type: 'UPDATE_CLOUD_SYNC', payload: { conflictStrategy: strategy } });
+  };
+
+  const setEncryptionPassphrase = (passphrase: string | undefined) => {
+    setEncryptionPassphraseState(passphrase);
   };
 
   const value: AppContextValue = {
@@ -497,6 +530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncNow,
     enableAutoSync,
     setConflictStrategy,
+    setEncryptionPassphrase,
   };
   
   return (

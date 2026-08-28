@@ -1,4 +1,5 @@
 import type { AppState, CloudSyncConfig } from '../types';
+import { encryptData, decryptData } from './encryption';
 
 const JSONBIN_BASE_URL = 'https://api.jsonbin.io/v3/b';
 
@@ -61,10 +62,31 @@ export const jsonBinSyncService: CloudSyncService = {
     }
 
     try {
-      const payload = {
-        _version: 1,
-        data,
+      // Prepare data for storage (remove cloudSync config from stored data to avoid circular refs)
+      const dataToStore = {
+        ...data,
+        cloudSync: {
+          ...data.cloudSync,
+          // Don't store the passphrase in the cloud
+          encryptionPassphrase: undefined,
+        },
       };
+
+      let payload: Record<string, unknown> = {
+        _version: 1,
+        data: dataToStore,
+      };
+
+      // Encrypt if passphrase is provided
+      if (config.encryptionPassphrase) {
+        const jsonString = JSON.stringify(dataToStore);
+        const encrypted = await encryptData(jsonString, config.encryptionPassphrase);
+        payload = {
+          _version: 1,
+          encrypted: true,
+          data: encrypted,
+        };
+      }
 
       const response = await fetch(getJsonBinUrl(config), {
         method: 'PUT',
@@ -74,9 +96,9 @@ export const jsonBinSyncService: CloudSyncService = {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
-          error: `Push failed: ${response.status} - ${errorData.message || 'Unknown error'}` 
+        return {
+          success: false,
+          error: `Push failed: ${response.status} - ${errorData.message || 'Unknown error'}`
         };
       }
 
@@ -102,23 +124,45 @@ export const jsonBinSyncService: CloudSyncService = {
           return { success: false, error: 'Bin not found (404)' };
         }
         const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
-          error: `Pull failed: ${response.status} - ${errorData.message || 'Unknown error'}` 
+        return {
+          success: false,
+          error: `Pull failed: ${response.status} - ${errorData.message || 'Unknown error'}`
         };
       }
 
       const result = await response.json();
-      const remoteData = result.record?.data || result.data;
+      const storedData = result.record?.data || result.data;
       
+      if (!storedData) {
+        return { success: false, error: 'No data found in remote storage' };
+      }
+
+      // Check if data is encrypted
+      let remoteData: AppState;
+      if (storedData.encrypted && storedData.data && typeof storedData.data === 'string') {
+        // Data is encrypted, need passphrase to decrypt
+        if (!config.encryptionPassphrase) {
+          return { success: false, error: 'Data is encrypted but no passphrase provided' };
+        }
+        try {
+          const decryptedJson = await decryptData(storedData.data, config.encryptionPassphrase);
+          remoteData = JSON.parse(decryptedJson);
+        } catch (error) {
+          return { success: false, error: 'Decryption failed - incorrect passphrase or corrupted data' };
+        }
+      } else {
+        // Legacy unencrypted format
+        remoteData = storedData as AppState;
+      }
+
       if (!remoteData || !Array.isArray(remoteData.materials) || !Array.isArray(remoteData.products)) {
         return { success: false, error: 'Invalid data format in remote storage' };
       }
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         data: remoteData as AppState,
-        lastSyncAt: new Date().toISOString() 
+        lastSyncAt: new Date().toISOString()
       };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Pull failed' };
